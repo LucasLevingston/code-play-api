@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum VideoSegment {
+  BACKEND
+  FRONTEND
+  FULLSTACK
+  ARTIFICIAL_INTELLIGENCE
+  DATA_SCIENCE
+  DEVOPS
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum LikeType {
+  VIDEO
+  COMMENT
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  username  String   @unique
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  age       Int
+  role      Role
+  avatarUrl String?
+
+  videos Video[]
+
+  watchLaterIds String[] @default([]) @db.ObjectId
+  historyIds    String[] @default([]) @db.ObjectId
+
+  comments Comment[]
+
+  likes Like[]
+
+  likedVideoIds   String[] @default([]) @db.ObjectId
+  likedCommentIds String[] @default([]) @db.ObjectId
+
+  subscriptions Subscription[] @relation("UserSubscriptions")
+
+  subscribers Subscription[] @relation("UserSubscribers")
+}
+
+model Subscription {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  subscriberId String @db.ObjectId
+  subscriber   User   @relation("UserSubscriptions", fields: [subscriberId], references: [id])
+
+  subscribedToId String @db.ObjectId
+  subscribedTo   User   @relation("UserSubscribers", fields: [subscribedToId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([subscriberId, subscribedToId])
+}
+
+model Video {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  description  String?
+  videoUrl     String
+  thumbnailUrl String
+  duration     String     @default("0:00")
+  views        Int        @default(0)
+  visibility   Visibility @default(PUBLIC)
+
+  segment VideoSegment
+
+  tags String[]
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  comments Comment[]
+
+  likes Like[]
+
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Comment {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  content String
+
+  authorId String @db.ObjectId
+  author   User   @relation(fields: [authorId], references: [id])
+
+  videoId String @db.ObjectId
+  video   Video  @relation(fields: [videoId], references: [id])
+
+  likes Like[]
+
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  type LikeType
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  videoId String? @db.ObjectId
+  video   Video?  @relation(fields: [videoId], references: [id])
+
+  commentId String?  @db.ObjectId
+  comment   Comment? @relation(fields: [commentId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, videoId])
+  @@index([userId, commentId])
+}

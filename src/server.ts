@@ -1,21 +1,14 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import http from "node:http";
-import router from "./routes";
+import server from "./app";
+import { env } from "./env";
 
-dotenv.config();
+const { PORT: port, HOST: host } = env;
 
-const app = express();
+server.listen({ port, host: "0.0.0.0" }).then((error) => {
+	if (error) {
+		console.error(error);
+		// process.exit(1)
+	}
 
-const server = http.createServer(app);
-
-app.use(cors());
-app.use(express.json());
-app.use("/api", router);
-
-const PORT = 3333;
-
-server.listen(PORT, () => {
-  console.log(`🚀 SERVER RODANDO NA PORTA ${PORT}`);
+	console.log(`Server is running on http://${host}:${port}`);
+	console.log(`API Docs is running on http://${host}:${port}/docs`);
 });
