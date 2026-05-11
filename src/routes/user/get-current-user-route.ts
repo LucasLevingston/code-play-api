@@ -5,7 +5,7 @@ import { checkRequestJWT } from "@/hooks/check-request-jwt";
 import { errorResponseSchema } from "@/schema/error-response-schema";
 import { getUserById } from "@/utils/actions/user/get-user-by-id";
 
-export const getUserRoute: FastifyPluginAsyncZod = async (server) => {
+export const getCurrentUserRoute: FastifyPluginAsyncZod = async (server) => {
 	server.get(
 		"/me",
 		{

@@ -13,6 +13,11 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 					limit: z.coerce.number().default(10),
 					segment: z.string().optional(),
 					search: z.string().optional(),
+					userId: z.string().optional(),
+					tag: z.string().optional(),
+					sortBy: z.enum(["createdAt", "views", "likes"]).default("createdAt"),
+					sortOrder: z.enum(["asc", "desc"]).default("desc"),
+					visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]).optional(),
 				}),
 				response: {
 					200: z.array(videoSchema),
@@ -24,7 +29,7 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 			},
 		},
 		async (request, reply) => {
-			const { page, limit, segment, search } = request.query;
+			const { page, limit, segment, search, userId, tag, sortBy, sortOrder, visibility } = request.query;
 
 			const skip = (page - 1) * limit;
 

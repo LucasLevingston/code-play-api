@@ -15,6 +15,7 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 							name: z.string(),
 							avatarUrl: z.string().nullable(),
 							subscribersCount: z.number(),
+							username: z.string(),
 						}),
 					),
 					401: z.object({ message: z.string() }),
@@ -37,6 +38,7 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 							name: true,
 							avatarUrl: true,
 							subscribers: true,
+							username: true
 						},
 					},
 				},
@@ -47,8 +49,9 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 				name: s.subscribedTo.name,
 				avatarUrl: s.subscribedTo.avatarUrl,
 				subscribersCount: s.subscribedTo.subscribers.length,
+				username: s.subscribedTo.username,
 			}));
-			console.log(subscriptions)
+
 			return reply.status(200).send(data || []);
 		},
 	);

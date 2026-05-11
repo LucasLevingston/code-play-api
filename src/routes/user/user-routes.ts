@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { getUserRoute } from "./get-user-route";
+import { getCurrentUserRoute } from "./get-current-user-route";
+import { getUserByidRoute } from "./get-user-by-id";
 
 export async function userRoutes(app: FastifyInstance) {
-	await app.register(getUserRoute);
+	await app.register(getCurrentUserRoute);
+	await app.register(getUserByidRoute);
 }
