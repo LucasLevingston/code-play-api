@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Pre-commit hook - Roda testes antes de commit
+# Uso: cp scripts/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit
+
+echo "🧪 Rodando testes antes de commit..."
+
+npm test
+TEST_RESULT=$?
+
+if [ $TEST_RESULT -ne 0 ]; then
+    echo "❌ Testes falharam. Commit cancelado."
+    echo ""
+    echo "Para commitar mesmo assim, use:"
+    echo "  git commit --no-verify"
+    exit 1
+fi
+
+echo "✅ Testes passaram! Commit liberado."
+exit 0

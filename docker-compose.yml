@@ -21,6 +21,40 @@ services:
         ' &&
         wait
       "
+    healthcheck:
+      test: mongosh --eval "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb-test:
+    image: mongo:6.0
+    container_name: mongodb_test
+    hostname: localhost-test
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_test_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=test
+    command: >
+      bash -c "
+        mongod --replSet rs0 --bind_ip_all &
+        sleep 5 &&
+        mongosh --eval '
+          rs.initiate({
+            _id: \"rs0\",
+            members: [{ _id: 0, host: \"localhost-test:27017\" }]
+          })
+        ' &&
+        wait
+      "
+    healthcheck:
+      test: mongosh --eval "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mongo_data:
+  mongo_test_data:

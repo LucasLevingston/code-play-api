@@ -12,11 +12,13 @@
 	"scripts": {
 		"dev": "tsx --env-file .env --watch src/server.ts",
 		"start": "tsx src/server.ts",
-		"pretest": "echo 'skip prisma db push for local vitest'",
-		"test": "vitest run",
+		"test": "vitest run --reporter=verbose",
 		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest watch",
-		"seed": "prisma generate && tsx --env-file .env prisma/seed.ts"
+		"test:ui": "vitest --ui",
+		"seed": "prisma generate && tsx --env-file .env.seed prisma/seed.ts",
+		"seed:test": "tsx --env-file .env.test prisma/seed.ts",
+		"setup:hooks": "bash scripts/setup-hooks.sh"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",

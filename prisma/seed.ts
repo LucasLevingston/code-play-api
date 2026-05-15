@@ -68,13 +68,11 @@ async function seed() {
 				title: faker.lorem.sentence(),
 				description: faker.lorem.paragraph(),
 				videoUrl: faker.helpers.arrayElement(mockVideos),
-				thumbnailUrl: `https:
-				duration: `${ faker.number.int({ min: 1, max: 59 }) }: ${
-			faker.number.int({
-				min: 10,
-				max: 59,
-			})
-		}`,
+				thumbnailUrl: `https://picsum.photos/640/480?random=${i}`,
+				duration: `${faker.number.int({ min: 1, max: 59 })}:${faker.number.int({
+					min: 10,
+					max: 59,
+				})}`,
 				views: faker.number.int({ min: 0, max: 100000 }),
 				visibility: faker.helpers.arrayElement([
 					Visibility.PUBLIC,
