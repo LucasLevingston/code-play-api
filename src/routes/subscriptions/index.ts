@@ -1,7 +1,10 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { checkRequestJWT } from "@/hooks/check-request-jwt";
-import { prisma } from "@/lib/prisma";
+import { ClientError } from "../../errors/client-error";
+import getUserSubscriptions from "../../modules/users/application/use-cases/GetUserSubscriptions";
+import subscribe from "../../modules/subscriptions/application/use-cases/Subscribe";
+import unsubscribe from "../../modules/subscriptions/application/use-cases/Unsubscribe";
 
 export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 	server.get(
@@ -20,6 +23,7 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 						}),
 					),
 					401: z.object({ message: z.string() }),
+					500: z.object({ message: z.string() }),
 				},
 				tags: ["subscriptions"],
 				summary: "Get user subscriptions",
@@ -28,33 +32,18 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 			preHandler: [checkRequestJWT],
 		},
 		async (request, reply) => {
-			const userId = request.user.id;
+			try {
+				const userId = request.user.id;
+				const subscriptions = await getUserSubscriptions({ userId });
 
-			const subscriptions = await prisma.subscription.findMany({
-				where: { subscriberId: userId },
-				select: {
-					subscribedTo: {
-						select: {
-							id: true,
-							name: true,
-							avatarUrl: true,
-							subscribers: true,
-							username: true
-						},
-					},
-				},
-			});
-
-			const data = subscriptions.map((s) => ({
-				id: s.subscribedTo.id,
-				name: s.subscribedTo.name,
-				avatarUrl: s.subscribedTo.avatarUrl,
-				subscribersCount: s.subscribedTo.subscribers.length,
-				username: s.subscribedTo.username,
-				isSubscribed: true
-			}));
-
-			return reply.status(200).send(data || []);
+				return reply.status(200).send(subscriptions);
+			} catch (error: any) {
+				if (error.code === "USER_NOT_FOUND") {
+					throw new ClientError("User not found", 404);
+				}
+				console.error(error);
+				throw new ClientError("Internal server error", 500);
+			}
 		},
 	);
 
@@ -70,7 +59,9 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 					200: z.object({ message: z.string() }),
 					401: z.object({ message: z.string() }),
 					400: z.object({ message: z.string() }),
+					409: z.object({ message: z.string() }),
 					404: z.object({ message: z.string() }),
+					500: z.object({ message: z.string() }),
 				},
 				tags: ["subscriptions"],
 				summary: "Subscribe to a channel",
@@ -79,34 +70,23 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 			preHandler: [checkRequestJWT],
 		},
 		async (request, reply) => {
-			const userId = request.user.id;
-			const { channelId } = request.params;
+			try {
+				const userId = request.user.id;
+				const { channelId } = request.params;
 
-			if (userId === channelId) {
-				return reply
-					.status(400)
-					.send({ message: "Cannot subscribe to yourself" });
+				await subscribe({ subscriberId: userId, subscribedToId: channelId });
+
+				return reply.status(200).send({ message: "Subscribed" });
+			} catch (error: any) {
+				if (error.code === "CANNOT_SUBSCRIBE_TO_SELF") {
+					return reply.status(400).send({ message: "Cannot subscribe to yourself" });
+				}
+				if (error.code === "ALREADY_SUBSCRIBED") {
+					return reply.status(409).send({ message: "Already subscribed" });
+				}
+				console.error(error);
+				throw new ClientError("Internal server error", 500);
 			}
-
-			const subscription = await prisma.subscription.findUnique({
-				where: {
-					subscriberId_subscribedToId: {
-						subscriberId: userId,
-						subscribedToId: channelId,
-					},
-				},
-			});
-
-			if (!subscription) {
-				await prisma.subscription.create({
-					data: {
-						subscriberId: userId,
-						subscribedToId: channelId,
-					},
-				});
-			}
-
-			return reply.status(200).send({ message: "Subscribed" });
 		},
 	);
 
@@ -130,38 +110,20 @@ export const subscriptionRoutes: FastifyPluginAsyncZod = async (server) => {
 			preHandler: [checkRequestJWT],
 		},
 		async (request, reply) => {
-			const userId = request.user.id;
-			const { channelId } = request.params;
+			try {
+				const userId = request.user.id;
+				const { channelId } = request.params;
 
-			const user = await prisma.user.findUnique({
-				where: { id: userId },
-			});
+				await unsubscribe({ subscriberId: userId, subscribedToId: channelId });
 
-			if (!user) {
-				return reply.status(401).send({ message: "User not found" });
+				return reply.status(200).send({ message: "Unsubscribed" });
+			} catch (error: any) {
+				if (error.code === "SUBSCRIPTION_NOT_FOUND") {
+					return reply.status(404).send({ message: "Subscription not found" });
+				}
+				console.error(error);
+				throw new ClientError("Internal server error", 500);
 			}
-
-			const subscription = await prisma.subscription.findUnique({
-				where: {
-					subscriberId_subscribedToId: {
-						subscriberId: userId,
-						subscribedToId: channelId,
-					},
-				},
-			});
-
-			if (subscription) {
-				await prisma.subscription.delete({
-					where: {
-						subscriberId_subscribedToId: {
-							subscriberId: userId,
-							subscribedToId: channelId,
-						},
-					},
-				});
-			}
-
-			return reply.status(200).send({ message: "Unsubscribed" });
 		},
 	);
 };

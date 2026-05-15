@@ -1,9 +1,9 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { ClientError } from "@/errors/client-error";
-import { checkRequestJWT } from "@/hooks/check-request-jwt";
-import { errorResponseSchema } from "@/schema/error-response-schema";
-import { getUserById } from "@/utils/actions/user/get-user-by-id";
+import { ClientError } from "../../errors/client-error";
+import { checkRequestJWT } from "../../hooks/check-request-jwt";
+import getCurrentUser from "../../modules/users/application/use-cases/GetCurrentUser";
+import { errorResponseSchema } from "../../schema/error-response-schema";
 
 export const getCurrentUserRoute: FastifyPluginAsyncZod = async (server) => {
 	server.get(
@@ -19,11 +19,11 @@ export const getCurrentUserRoute: FastifyPluginAsyncZod = async (server) => {
 						age: z.number(),
 						role: z.string(),
 						avatarUrl: z.string().nullable(),
-						createdAt: z.date(),
-						subscribersCount: z.number(),
+							username: z.string(),
 					}),
 					401: errorResponseSchema,
 					404: errorResponseSchema,
+						500: errorResponseSchema,
 				},
 				tags: ["users"],
 				summary: "Get current user",
@@ -32,15 +32,26 @@ export const getCurrentUserRoute: FastifyPluginAsyncZod = async (server) => {
 			},
 		},
 		async (request, reply) => {
-			const userId = request.user.id;
+			try {
+				const userId = request.user.id;
+				const user = await getCurrentUser(userId);
 
-			const user = await getUserById({ userId });
-
-			if (!user) {
-				throw new ClientError("User not found", 404);
+				return reply.status(200).send({
+					id: user.id,
+					name: user.name,
+					username: user.username,
+					email: user.email,
+					age: user.age,
+					role: user.role,
+					avatarUrl: user.avatarUrl ?? null,
+				});
+			} catch (error: any) {
+				if (error.code === "USER_NOT_FOUND") {
+					throw new ClientError("User not found", 404);
+				}
+				console.error(error);
+				throw new ClientError("Internal server error", 500);
 			}
-
-			return reply.status(200).send(user);
 		},
 	);
 };

@@ -1,8 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { errorResponseSchema } from "@/schema/error-response-schema";
-import { generateToken, hashPassword } from "@/utils/jwt";
+import registerUser from "../../modules/users/application/use-cases/RegisterUser";
+import { errorResponseSchema } from "../../schema/error-response-schema";
 
 export const registerUserRoute: FastifyPluginAsyncZod = async (server) => {
 	server.post(
@@ -35,6 +34,7 @@ export const registerUserRoute: FastifyPluginAsyncZod = async (server) => {
 					}),
 					409: errorResponseSchema,
 					400: errorResponseSchema,
+						500: errorResponseSchema,
 				},
 				tags: ["auth"],
 				summary: "Register a new user",
@@ -42,43 +42,21 @@ export const registerUserRoute: FastifyPluginAsyncZod = async (server) => {
 			},
 		},
 		async (request, reply) => {
-			{
-				const { email, password, name, age, role, username } = request.body;
-
-				const existingUser = await prisma.user.findUnique({
-					where: { email },
-				});
-				if (existingUser) {
-					return reply.status(409).send({
-						message: "User already exists with this email",
-					});
+			try {
+				const result = await registerUser(request.body as any);
+				return reply.status(201).send(result);
+			} catch (error: any) {
+				if (
+					error.code === "USER_EXISTS" ||
+					error.message === "User already exists"
+				) {
+					return reply
+						.status(409)
+						.send({ message: "User already exists with this email" });
 				}
 
-				const hashedPassword = await hashPassword(password);
-
-				const user = await prisma.user.create({
-					data: {
-						name,
-						age,
-						role: role || "USER",
-						email,
-						password: hashedPassword,
-						username,
-					},
-				});
-
-				const token = generateToken(user.id);
-
-				return reply.status(201).send({
-					user: {
-						id: user.id,
-						name: user.name,
-						email: user.email,
-						age: user.age,
-						role: user.role,
-					},
-					token,
-				});
+				console.error(error);
+				return reply.status(500).send({ message: "Internal server error" });
 			}
 		},
 	);

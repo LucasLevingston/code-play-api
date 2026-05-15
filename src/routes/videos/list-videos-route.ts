@@ -1,9 +1,27 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { videoSchema } from "@/schema/schemas";
-import { verifyToken } from "@/utils/jwt/jwt";
-import { ClientError } from "@/errors/client-error";
+import listVideos from "../../modules/videos/application/use-cases/ListVideos";
+
+const listedVideoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	description: z.string().nullable(),
+	videoUrl: z.string(),
+	thumbnailUrl: z.string(),
+	duration: z.string(),
+	views: z.number(),
+	visibility: z.enum(["PUBLIC", "UNLISTED", "PRIVATE"]),
+	segment: z.enum([
+		"BACKEND",
+		"FRONTEND",
+		"FULLSTACK",
+		"ARTIFICIAL_INTELLIGENCE",
+		"DATA_SCIENCE",
+		"DEVOPS",
+	]),
+	tags: z.array(z.string()),
+	userId: z.string(),
+});
 
 export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 	server.get(
@@ -23,7 +41,8 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 					videoId: z.string().optional(),
 				}),
 				response: {
-					200: z.array(videoSchema),
+					200: z.array(listedVideoSchema),
+					500: z.object({ message: z.string() }),
 				},
 				tags: ["videos"],
 				summary: "List all videos",
@@ -32,132 +51,19 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 			},
 		},
 		async (request, reply) => {
-			const { page, limit, segment, search, userId, tag, sortBy, sortOrder, visibility, videoId } = request.query as any;
+			try {
+				const { page = 1, limit = 10 } = request.query as any;
+				const offset = (page - 1) * limit;
 
-			const skip = (page - 1) * limit;
+				const videos = await listVideos({ limit, offset });
 
-
-			const filters: any = {
-				visibility: "PUBLIC",
-			};
-
-
-			if (segment === "liked" || segment === "watch-later" || segment === "history") {
-				const auth = request.headers.authorization;
-				if (!auth) {
-					throw new ClientError("Token is missing.", 401);
-				}
-
-				let payload: any;
-				try {
-					payload = verifyToken(auth);
-				} catch (err) {
-					throw new ClientError("Invalid token.", 401);
-				}
-
-				const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-				if (!user) {
-					throw new ClientError("User not found.", 401);
-				}
-
-				if (segment === "liked") {
-					const likedVideos = await prisma.video.findMany({
-						where: { id: { in: user.likedVideoIds } },
-						take: limit,
-						include: {
-							user: { select: { id: true, name: true, avatarUrl: true, subscribers: true } },
-						},
-					});
-
-					return reply.status(200).send(likedVideos);
-				}
-
-				if (segment === "watch-later") {
-					const watchLaterVideos = await prisma.video.findMany({
-						where: { id: { in: user.watchLaterIds } },
-						take: limit,
-						include: {
-							user: { select: { id: true, name: true, avatarUrl: true, subscribers: true } },
-						},
-					});
-
-					return reply.status(200).send(watchLaterVideos);
-				}
-
-				if (segment === "history") {
-					const historyVideos = await prisma.video.findMany({
-						where: { id: { in: user.historyIds } },
-						take: limit,
-						orderBy: { createdAt: "desc" },
-						include: {
-							user: { select: { id: true, name: true, avatarUrl: true, subscribers: true } },
-						},
-					});
-
-					return reply.status(200).send(historyVideos);
-				}
-			}
-
-
-			if (segment === "next-up") {
-				if (!videoId) {
-					throw new ClientError("videoId is required for next-up", 400);
-				}
-
-				const current = await prisma.video.findUnique({ where: { id: videoId } });
-				if (!current) {
-					throw new ClientError("Video not found", 404);
-				}
-
-
-				const related = await prisma.video.findMany({
-					where: {
-						id: { not: videoId },
-						OR: [
-							{ userId: current.userId },
-							{ tags: { hasSome: current.tags } },
-						],
-						visibility: "PUBLIC",
-					},
-					take: limit,
-					include: {
-						user: { select: { id: true, name: true, avatarUrl: true, subscribers: true } },
-					},
+				return reply.status(200).send(videos);
+			} catch (error: any) {
+				console.error(error);
+				return reply.status(500).send({
+					message: "Internal server error",
 				});
-
-				return reply.status(200).send(related);
 			}
-
-
-			if (segment) {
-				filters.segment = segment;
-			}
-
-			if (search) {
-				filters.$or = [
-					{ title: { $regex: search, $options: "i" } },
-					{ description: { $regex: search, $options: "i" } },
-				];
-			}
-
-			const videos = await prisma.video.findMany({
-				where: filters,
-				skip,
-				take: limit,
-				orderBy: { createdAt: "desc" },
-				include: {
-					user: {
-						select: {
-							id: true,
-							name: true,
-							avatarUrl: true,
-							subscribers: true,
-						},
-					},
-				},
-			});
-
-			return reply.status(200).send(videos);
 		},
 	);
 };
