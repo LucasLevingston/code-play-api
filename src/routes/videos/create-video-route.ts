@@ -1,10 +1,9 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
-import fs from "fs/promises";
-import path from "path";
 import { checkRequestJWT } from "@/hooks/check-request-jwt";
 import { prisma } from "@/lib/prisma";
 import { errorResponseSchema } from "@/schema/error-response-schema";
 import { videoSchema } from "@/schema/schemas";
+import { storeMediaFile } from "@/utils/upload-media";
 import type { VideoSegment, Visibility } from "../../../generated/prisma";
 
 export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
@@ -39,8 +38,8 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 			let segment: VideoSegment | null = null;
 			let visibility: Visibility = "PUBLIC";
 			let tags: string[] = [];
-			let videoFile: Buffer | null = null;
-			let thumbnailFile: Buffer | null = null;
+			let videoUrl = "";
+			let thumbnailUrl = "";
 
 			for await (const part of data) {
 				if (part.type === "field") {
@@ -59,29 +58,31 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 						}
 					}
 				} else if (part.type === "file") {
-					const buffer = await part.toBuffer();
-					if (part.fieldname === "video") videoFile = buffer;
-					if (part.fieldname === "thumbnail") thumbnailFile = buffer;
+					if (part.fieldname === "video") {
+						videoUrl = await storeMediaFile({
+							stream: part.file,
+							folder: "videos",
+							fileName: part.filename,
+							contentType: part.mimetype,
+						});
+					}
+
+					if (part.fieldname === "thumbnail") {
+						thumbnailUrl = await storeMediaFile({
+							stream: part.file,
+							folder: "thumbnails",
+							fileName: part.filename,
+							contentType: part.mimetype,
+						});
+					}
 				}
 			}
 
-			if (!videoFile || !thumbnailFile) {
+			if (!videoUrl || !thumbnailUrl) {
 				return reply.status(400).send({
 					message: "Video and thumbnail files are required",
 				});
 			}
-
-			const uploadsDir = path.join(process.cwd(), "uploads");
-			await fs.mkdir(uploadsDir, { recursive: true });
-
-			const videoFileName = `video-${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`;
-			const thumbnailFileName = `thumbnail-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-
-			const videoPath = path.join(uploadsDir, videoFileName);
-			const thumbnailPath = path.join(uploadsDir, thumbnailFileName);
-
-			await fs.writeFile(videoPath, videoFile);
-			await fs.writeFile(thumbnailPath, thumbnailFile);
 
 			const video = await prisma.video.create({
 				data: {
@@ -91,10 +92,19 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 					visibility,
 					tags,
 					duration: "0:00",
-					videoUrl: `/uploads/${videoFileName}`,
-					thumbnailUrl: `/uploads/${thumbnailFileName}`,
+					videoUrl,
+					thumbnailUrl,
 					userId: userId,
 					segment: segment || "FULLSTACK",
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							name: true,
+							avatarUrl: true,
+						},
+					},
 				},
 			});
 

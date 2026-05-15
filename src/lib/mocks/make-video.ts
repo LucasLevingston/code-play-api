@@ -23,6 +23,13 @@ export const getVideosMock = async (
       ),
    );
 
+export const mockVideos = [
+   "https://www.w3schools.com/html/mov_bbb.mp4",
+
+   "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+
+];
+
 export const getVideoMock = async (
    userId?: string,
 ): Promise<Video> => {
@@ -38,7 +45,7 @@ export const getVideoMock = async (
             faker.lorem.paragraphs(3),
 
          videoUrl:
-            faker.internet.url(),
+            faker.helpers.arrayElement(mockVideos),
 
          thumbnailUrl: `https://picsum.photos/300/200?random=${faker.number.int(
             {

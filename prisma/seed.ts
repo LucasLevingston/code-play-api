@@ -7,6 +7,7 @@ import {
 	Visibility,
 } from "../generated/prisma";
 import { makeUser } from "./../src/lib/mocks/make-user";
+import { mockVideos } from "./../src/lib/mocks/make-video";
 
 const prisma = new PrismaClient();
 
@@ -17,19 +18,17 @@ async function seed() {
 	await prisma.subscription.deleteMany();
 	await prisma.user.deleteMany();
 
-
-	// TEST USER
 	const { user: testUser } = await makeUser({
 		id: "681e4b70c5d2d52d0a5f9f3a",
 		name: "test user",
 		username: "testuser",
 		email: "test@test.com",
-		password: '123456',
+		password: "123456",
 		age: 22,
 		role: Role.ADMIN,
 	});
 
-	// USERS
+
 	const users = await Promise.all(
 		Array.from({ length: 10 }).map(async () => {
 			return prisma.user.create({
@@ -37,7 +36,7 @@ async function seed() {
 					name: faker.person.fullName(),
 					username: faker.internet.username().toLowerCase(),
 					email: faker.internet.email().toLowerCase(),
-					password: '123456',
+					password: "123456",
 					age: faker.number.int({ min: 18, max: 40 }),
 					role: Role.USER,
 					avatarUrl: faker.image.avatar(),
@@ -48,7 +47,7 @@ async function seed() {
 
 	const allUsers = [testUser, ...users];
 
-	// SUBSCRIPTIONS
+
 	for (const user of users) {
 		await prisma.subscription.create({
 			data: {
@@ -58,7 +57,7 @@ async function seed() {
 		});
 	}
 
-	// VIDEOS
+
 	const videos = [];
 
 	for (let i = 0; i < 20; i++) {
@@ -68,13 +67,14 @@ async function seed() {
 			data: {
 				title: faker.lorem.sentence(),
 				description: faker.lorem.paragraph(),
-				videoUrl:
-					"https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-				thumbnailUrl: `https://picsum.photos/seed/${i}/1280/720`,
-				duration: `${faker.number.int({ min: 1, max: 59 })}:${faker.number.int({
-					min: 10,
-					max: 59,
-				})}`,
+				videoUrl: faker.helpers.arrayElement(mockVideos),
+				thumbnailUrl: `https:
+				duration: `${ faker.number.int({ min: 1, max: 59 }) }: ${
+			faker.number.int({
+				min: 10,
+				max: 59,
+			})
+		}`,
 				views: faker.number.int({ min: 0, max: 100000 }),
 				visibility: faker.helpers.arrayElement([
 					Visibility.PUBLIC,
@@ -111,7 +111,7 @@ async function seed() {
 		videos.push(video);
 	}
 
-	// COMMENTS
+	
 	const comments = [];
 
 	for (let i = 0; i < 50; i++) {
@@ -130,7 +130,7 @@ async function seed() {
 		comments.push(comment);
 	}
 
-	// VIDEO LIKES
+	
 	for (let i = 0; i < 100; i++) {
 		const randomUser = allUsers[Math.floor(Math.random() * allUsers.length)];
 
@@ -158,7 +158,7 @@ async function seed() {
 		} catch { }
 	}
 
-	// COMMENT LIKES
+	
 	for (let i = 0; i < 100; i++) {
 		const randomUser = allUsers[Math.floor(Math.random() * allUsers.length)];
 
@@ -186,7 +186,7 @@ async function seed() {
 		} catch { }
 	}
 
-	// WATCH LATER + HISTORY
+	
 	for (const user of allUsers) {
 		const randomVideos = faker.helpers.arrayElements(videos, 5);
 

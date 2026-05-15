@@ -10,6 +10,10 @@ const envSchema = z.object({
 	HOST: z.string(),
 	NODEMAILER_PASS: z.string(),
 	FRONTEND_URL: z.string(),
+	AWS_REGION: z.string(),
+	AWS_S3_BUCKET: z.string(),
+	AWS_ACCESS_KEY_ID: z.string(),
+	AWS_SECRET_ACCESS_KEY: z.string(),
 	NODE_ENV: z.enum(["test", "development", "production"]),
 });
 

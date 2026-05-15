@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import { getIsSubscribed } from "../video/get-is-subscribed";
+import { getVideosByUserId } from "../video/get-videos-by-user-id";
 
-export const getUserById = async (id: string) => {
+export const getUserById = async ({ userId, requestUserId }: { userId: string, requestUserId?: string }) => {
 	const user = await prisma.user.findUnique({
-		where: { id },
+		where: { id: userId },
 		select: {
 			id: true,
 			name: true,
@@ -13,6 +15,7 @@ export const getUserById = async (id: string) => {
 			username: true,
 			createdAt: true,
 			subscribers: true,
+
 		},
 	});
 
@@ -22,6 +25,8 @@ export const getUserById = async (id: string) => {
 
 	return {
 		...user,
+		isSubscribed: await getIsSubscribed({ channelId: user.id, userId: requestUserId }),
 		subscribersCount: user.subscribers.length,
+		videos: await getVideosByUserId({ userId: user.id }),
 	};
 };

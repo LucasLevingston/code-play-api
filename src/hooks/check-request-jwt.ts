@@ -18,7 +18,7 @@ export async function checkRequestJWT(
 	if (!payload) {
 		throw new ClientError("Invalid Token");
 	}
-	const user = await getUserById(payload.userId);
+	const user = await getUserById({ userId: payload.userId });
 	if (!user) {
 		throw new ClientError("Invalid User");
 	}

@@ -52,7 +52,7 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 	);
 
-	// Get watch later videos
+
 	server.get(
 		"/watch-later",
 		{
@@ -101,7 +101,7 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 	);
 
-	// Get history videos
+
 	server.get(
 		"/history",
 		{
@@ -151,7 +151,7 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 	);
 
-	// Add video to liked
+
 	server.post(
 		"/:videoId/like",
 		{
@@ -190,31 +190,17 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 				return reply.status(404).send({ message: "Video not found" });
 			}
 
-			if (!user.likedVideoIds.includes(videoId)) {
-				await prisma.user.update({
-					where: { id: userId },
-					data: {
-						likedVideoIds: { push: videoId },
-					},
-				});
-
-				await prisma.user.update({
-					where: { id: videoId },
-					data: {
-						likes: {
-							create: {
-								type: "VIDEO",
-							},
-						},
-					},
-				});
+			const existingLike = await prisma.like.findFirst({ where: { userId, videoId } });
+			if (!existingLike) {
+				await prisma.like.create({ data: { type: "VIDEO", userId, videoId } });
+				await prisma.user.update({ where: { id: userId }, data: { likedVideoIds: { push: videoId } } });
 			}
 
 			return reply.status(200).send({ message: "Video liked" });
 		},
 	);
 
-	// Remove video from liked
+
 	server.delete(
 		"/:videoId/like",
 		{
@@ -254,25 +240,19 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 			}
 
 			if (user.likedVideoIds.includes(videoId)) {
-				await prisma.user.update({
-					where: { id: userId },
-					data: {
-						likedVideoIds: {
-							set: user.likedVideoIds.filter((id) => id !== videoId),
-						},
-					},
-				});
+				const existing = await prisma.like.findFirst({ where: { userId, videoId } });
+				if (existing) {
+					await prisma.like.delete({ where: { id: existing.id } });
+				}
 
-				await prisma.like.delete({
-					where: { id: videoId, userId: user.id },
-				});
+				await prisma.user.update({ where: { id: userId }, data: { likedVideoIds: { set: user.likedVideoIds.filter((id) => id !== videoId) } } });
 			}
 
 			return reply.status(200).send({ message: "Video unliked" });
 		},
 	);
 
-	// Add to watch later
+
 	server.post(
 		"/:videoId/watch-later",
 		{
@@ -324,7 +304,7 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 	);
 
-	// Remove from watch later
+
 	server.delete(
 		"/:videoId/watch-later",
 		{
@@ -378,7 +358,7 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 	);
 
-	// Add to history
+
 	server.post(
 		"/:videoId/history",
 		{
@@ -417,16 +397,129 @@ export const videoUserActionsRoute: FastifyPluginAsyncZod = async (server) => {
 				return reply.status(404).send({ message: "Video not found" });
 			}
 
-			if (!user.historyIds.includes(videoId)) {
-				await prisma.user.update({
-					where: { id: userId },
-					data: {
-						historyIds: { push: videoId },
-					},
-				});
-			}
+			// Move videoId to the end of historyIds (most recent last)
+			const currentHistory = user.historyIds || [];
+			const newHistory = currentHistory.filter((id) => id !== videoId);
+			newHistory.push(videoId);
+			await prisma.user.update({ where: { id: userId }, data: { historyIds: { set: newHistory } } });
 
 			return reply.status(200).send({ message: "Added to history" });
+		},
+	);
+
+
+
+	server.post(
+		"/comments",
+		{
+			schema: {
+				body: z.object({ content: z.string().min(1), videoId: z.string() }),
+				response: {
+					200: z.any(),
+					401: z.object({ message: z.string() }),
+					404: z.object({ message: z.string() }),
+				},
+				tags: ["videos"],
+				summary: "Create a comment",
+				security: [{ bearerAuth: [] }],
+			},
+			preHandler: [checkRequestJWT],
+		},
+		async (request, reply) => {
+			const userId = request.user.id;
+			const { content, videoId } = request.body as { content: string; videoId: string };
+
+			const video = await prisma.video.findUnique({ where: { id: videoId } });
+			if (!video) {
+				return reply.status(404).send({ message: "Video not found" });
+			}
+
+			const comment = await prisma.comment.create({
+				data: {
+					content,
+					authorId: userId,
+					videoId,
+				},
+				include: {
+					author: { select: { id: true, name: true, avatarUrl: true } },
+				},
+			});
+
+			return reply.status(200).send({
+				id: comment.id,
+				content: comment.content,
+				createdAt: comment.createdAt,
+				author: comment.author,
+			});
+		},
+	);
+
+
+
+	server.post(
+		"/comments/:commentId/like",
+		{
+			schema: {
+				params: z.object({ commentId: z.string() }),
+				response: {
+					200: z.object({ message: z.string() }),
+					401: z.object({ message: z.string() }),
+					404: z.object({ message: z.string() }),
+				},
+				tags: ["videos"],
+				summary: "Like a comment",
+				security: [{ bearerAuth: [] }],
+			},
+			preHandler: [checkRequestJWT],
+		},
+		async (request, reply) => {
+			const userId = request.user.id;
+			const { commentId } = request.params as { commentId: string };
+
+			const comment = await prisma.comment.findUnique({ where: { id: commentId } });
+			if (!comment) {
+				return reply.status(404).send({ message: "Comment not found" });
+			}
+
+
+			const existing = await prisma.like.findFirst({ where: { userId, commentId } });
+			if (!existing) {
+				await prisma.like.create({ data: { type: "COMMENT", userId, commentId } });
+				await prisma.user.update({ where: { id: userId }, data: { likedCommentIds: { push: commentId } } });
+			}
+
+			return reply.status(200).send({ message: "Comment liked" });
+		},
+	);
+
+
+	server.delete(
+		"/comments/:commentId/like",
+		{
+			schema: {
+				params: z.object({ commentId: z.string() }),
+				response: {
+					200: z.object({ message: z.string() }),
+					401: z.object({ message: z.string() }),
+					404: z.object({ message: z.string() }),
+				},
+				tags: ["videos"],
+				summary: "Unlike a comment",
+				security: [{ bearerAuth: [] }],
+			},
+			preHandler: [checkRequestJWT],
+		},
+		async (request, reply) => {
+			const userId = request.user.id;
+			const { commentId } = request.params as { commentId: string };
+
+			const existing = await prisma.like.findFirst({ where: { userId, commentId } });
+			if (existing) {
+				await prisma.like.delete({ where: { id: existing.id } });
+				await prisma.user.update({ where: { id: userId }, data: { likedCommentIds: { set: (request.user.likedCommentIds || []).filter((id: string) => id !== commentId) } } });
+			}
+
+			return reply.status(200).send({ message: "Comment unliked" });
 		},
 	);
 };

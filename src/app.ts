@@ -13,11 +13,11 @@ import {
 } from "fastify-type-provider-zod";
 import path from "path";
 import { env } from "./env";
-import { errorHandler } from "./utils/error-handler";
-import { authRoutes } from "./routes/user";
-import { videoRoutes } from "./routes/videos";
-import { userRoutes } from "./routes/user/user-routes";
 import { subscriptionRoutes } from "./routes/subscriptions";
+import { authRoutes } from "./routes/user";
+import { userRoutes } from "./routes/user/user-routes";
+import { videoRoutes } from "./routes/videos";
+import { errorHandler } from "./utils/error-handler";
 
 const { JWT_SECRET_KEY, NODE_ENV } = env;
 
@@ -35,6 +35,7 @@ const server = fastify({
 
 server.register(fastifyCors, {
 	origin: "*",
+	methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
 	// ['https://expert-gp.vercel.app/', 'http://localhost:5173'],
 });
 
@@ -76,7 +77,7 @@ server.setErrorHandler(errorHandler);
 server.register(fastifyCookie);
 server.register(fastifyMultipart, {
 	limits: {
-		fileSize: 5 * 1024 * 1024,
+		fileSize: 500 * 1024 * 1024,
 	},
 });
 

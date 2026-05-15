@@ -34,7 +34,7 @@ export const getCurrentUserRoute: FastifyPluginAsyncZod = async (server) => {
 		async (request, reply) => {
 			const userId = request.user.id;
 
-			const user = await getUserById(userId);
+			const user = await getUserById({ userId });
 
 			if (!user) {
 				throw new ClientError("User not found", 404);
