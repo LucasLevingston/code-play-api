@@ -16,7 +16,7 @@
 		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest watch",
 		"test:ui": "vitest --ui",
-		"seed": "prisma generate && tsx --env-file .env.seed prisma/seed.ts",
+		"seed": "prisma generate && tsx --env-file .env prisma/seed.ts",
 		"seed:test": "tsx --env-file .env.test prisma/seed.ts",
 		"setup:hooks": "bash scripts/setup-hooks.sh"
 	},
