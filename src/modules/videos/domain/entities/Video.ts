@@ -12,6 +12,11 @@ export interface VideoProps {
    userId: string;
    publishedAt: Date;
    createdAt: Date;
+   user?: {
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+   };
 }
 
 export default function createVideoEntity(props: VideoProps) {

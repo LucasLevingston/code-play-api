@@ -2,27 +2,32 @@ import { prisma } from "../../../../lib/prisma";
 import type { VideoProps } from "../../domain/entities/Video";
 import type { IVideoRepository } from "../../domain/repositories/IVideoRepository";
 
+const userSelect = { name: true, username: true, avatarUrl: true } as const;
+
 export function createPrismaVideoRepository(): IVideoRepository {
    return {
       async findById(id: string) {
-         const video = await prisma.video.findUnique({ where: { id } });
-         return video
-            ? {
-               id: video.id,
-               title: video.title,
-               description: video.description,
-               videoUrl: video.videoUrl,
-               thumbnailUrl: video.thumbnailUrl,
-               duration: video.duration,
-               views: video.views,
-               visibility: video.visibility,
-               segment: video.segment,
-               tags: video.tags,
-               userId: video.userId,
-               publishedAt: video.publishedAt,
-               createdAt: video.createdAt,
-            }
-            : null;
+         const video = await prisma.video.findUnique({
+            where: { id },
+            include: { user: { select: userSelect } },
+         });
+         if (!video) return null;
+         return {
+            id: video.id,
+            title: video.title,
+            description: video.description,
+            videoUrl: video.videoUrl,
+            thumbnailUrl: video.thumbnailUrl,
+            duration: video.duration,
+            views: video.views,
+            visibility: video.visibility,
+            segment: video.segment,
+            tags: video.tags,
+            userId: video.userId,
+            user: video.user,
+            publishedAt: video.publishedAt,
+            createdAt: video.createdAt,
+         };
       },
 
       async findByUserId(userId: string, limit = 10, offset = 0) {
@@ -30,6 +35,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
             where: { userId },
             take: limit,
             skip: offset,
+            include: { user: { select: userSelect } },
          });
          return videos.map((v) => ({
             id: v.id,
@@ -43,6 +49,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
             segment: v.segment,
             tags: v.tags,
             userId: v.userId,
+            user: v.user,
             publishedAt: v.publishedAt,
             createdAt: v.createdAt,
          }));
@@ -53,6 +60,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
             where: { visibility: "PUBLIC" },
             take: limit,
             skip: offset,
+            include: { user: { select: userSelect } },
          });
          return videos.map((v) => ({
             id: v.id,
@@ -66,6 +74,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
             segment: v.segment,
             tags: v.tags,
             userId: v.userId,
+            user: v.user,
             publishedAt: v.publishedAt,
             createdAt: v.createdAt,
          }));
@@ -87,6 +96,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
                userId: video.userId,
                publishedAt: video.publishedAt,
             },
+            include: { user: { select: userSelect } },
          });
          return {
             id: created.id,
@@ -100,15 +110,18 @@ export function createPrismaVideoRepository(): IVideoRepository {
             segment: created.segment,
             tags: created.tags,
             userId: created.userId,
+            user: created.user,
             publishedAt: created.publishedAt,
             createdAt: created.createdAt,
          };
       },
 
       async update(id: string, video: Partial<VideoProps>) {
+         const { user: _user, userId: _userId, id: _id, createdAt: _createdAt, ...updateData } = video;
          const updated = await prisma.video.update({
             where: { id },
-            data: video,
+            data: updateData,
+            include: { user: { select: userSelect } },
          });
          return {
             id: updated.id,
@@ -122,6 +135,7 @@ export function createPrismaVideoRepository(): IVideoRepository {
             segment: updated.segment,
             tags: updated.tags,
             userId: updated.userId,
+            user: updated.user,
             publishedAt: updated.publishedAt,
             createdAt: updated.createdAt,
          };

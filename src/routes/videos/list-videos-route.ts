@@ -52,13 +52,13 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 		async (request, reply) => {
 			try {
-				const { page = 1, limit = 10 } = request.query as any;
+				const { page = 1, limit = 10 } = request.query;
 				const offset = (page - 1) * limit;
 
 				const videos = await listVideos({ limit, offset });
 
 				return reply.status(200).send(videos);
-			} catch (error: any) {
+			} catch (error: unknown) {
 				console.error(error);
 				return reply.status(500).send({
 					message: "Internal server error",
