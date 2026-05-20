@@ -3,18 +3,23 @@
 # Pre-commit hook - Roda testes antes de commit
 # Uso: cp scripts/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit
 
-echo "🧪 Rodando testes antes de commit..."
+echo "Rodando verificacoes antes de commit..."
 
-npm test
-TEST_RESULT=$?
-
-if [ $TEST_RESULT -ne 0 ]; then
-    echo "❌ Testes falharam. Commit cancelado."
-    echo ""
-    echo "Para commitar mesmo assim, use:"
-    echo "  git commit --no-verify"
+echo "[1/2] Type check..."
+npx tsc --noEmit
+if [ $? -ne 0 ]; then
+    echo "Erros de tipagem encontrados. Commit cancelado."
+    echo "Use 'git commit --no-verify' para pular (nao recomendado)"
     exit 1
 fi
 
-echo "✅ Testes passaram! Commit liberado."
+echo "[2/2] Testes..."
+npm test
+if [ $? -ne 0 ]; then
+    echo "Testes falharam. Commit cancelado."
+    echo "Use 'git commit --no-verify' para pular (nao recomendado)"
+    exit 1
+fi
+
+echo "Tudo certo! Commit liberado."
 exit 0

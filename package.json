@@ -12,11 +12,12 @@
 	"scripts": {
 		"dev": "tsx --env-file .env --watch src/server.ts",
 		"start": "tsx src/server.ts",
-		"test": "vitest run --reporter=verbose",
-		"test:coverage": "vitest run --coverage",
-		"test:watch": "vitest watch",
-		"test:ui": "vitest --ui",
-		"seed": "prisma generate && tsx prisma/seed.ts",
+		"test": "dotenv -e .env.test -- vitest run --reporter=verbose",
+		"test:coverage": "dotenv -e .env.test -- vitest run --coverage",
+		"test:watch": "dotenv -e .env.test -- vitest watch",
+		"test:ui": "dotenv -e .env.test -- vitest --ui",
+		"seed": "prisma generate && tsx --env-file .env prisma/seed.ts",
+		"seed:local": "prisma generate && tsx --env-file .env.seed prisma/seed.ts",
 		"seed:test": "tsx --env-file .env.test prisma/seed.ts",
 		"setup:hooks": "bash scripts/setup-hooks.sh"
 	},
