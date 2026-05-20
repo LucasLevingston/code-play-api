@@ -1,35 +1,8 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import listVideos from "../../modules/videos/application/use-cases/ListVideos";
+import { videoItemSchema } from "./schemas";
 
-const listedVideoSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	description: z.string().nullable(),
-	videoUrl: z.string(),
-	thumbnailUrl: z.string(),
-	duration: z.string(),
-	views: z.number(),
-	visibility: z.enum(["PUBLIC", "UNLISTED", "PRIVATE"]),
-	segment: z.enum([
-		"BACKEND",
-		"FRONTEND",
-		"FULLSTACK",
-		"ARTIFICIAL_INTELLIGENCE",
-		"DATA_SCIENCE",
-		"DEVOPS",
-	]),
-	tags: z.array(z.string()),
-	userId: z.string(),
-	publishedAt: z.union([z.string(), z.date()]),
-	user: z
-		.object({
-			name: z.string(),
-			username: z.string(),
-			avatarUrl: z.string().nullable(),
-		})
-		.optional(),
-});
 
 export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 	server.get(
@@ -49,7 +22,7 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 					videoId: z.string().optional(),
 				}),
 				response: {
-					200: z.array(listedVideoSchema),
+					200: z.array(videoItemSchema),
 					500: z.object({ message: z.string() }),
 				},
 				tags: ["videos"],

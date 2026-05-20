@@ -1,30 +1,10 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
-import { z } from "zod";
-import { checkRequestJWT } from "../../hooks/check-request-jwt";
 import createVideo from "../../modules/videos/application/use-cases/CreateVideo";
+import type { CreateVideoDTO } from "../../modules/videos/application/use-cases/CreateVideo";
 import { errorResponseSchema } from "../../schema/error-response-schema";
+import { checkRequestJWT } from "../../hooks/check-request-jwt";
+import { segmentEnum, videoItemSchema, visibilityEnum } from "./schemas";
 import { storeMediaFile } from "../../utils/upload-media";
-
-const createdVideoResponseSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	description: z.string().nullable(),
-	videoUrl: z.string(),
-	thumbnailUrl: z.string(),
-	duration: z.string(),
-	views: z.number(),
-	visibility: z.enum(["PUBLIC", "UNLISTED", "PRIVATE"]),
-	segment: z.enum([
-		"BACKEND",
-		"FRONTEND",
-		"FULLSTACK",
-		"ARTIFICIAL_INTELLIGENCE",
-		"DATA_SCIENCE",
-		"DEVOPS",
-	]),
-	tags: z.array(z.string()),
-	userId: z.string(),
-});
 
 export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 	server.post(
@@ -32,10 +12,10 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 		{
 			schema: {
 				response: {
-						201: createdVideoResponseSchema,
+					201: videoItemSchema,
 					400: errorResponseSchema,
 					401: errorResponseSchema,
-						500: errorResponseSchema,
+					500: errorResponseSchema,
 				},
 				tags: ["videos"],
 				summary: "Create video",
@@ -50,15 +30,13 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 				const data = request.parts();
 
 				if (!data) {
-					return reply.status(400).send({
-						message: "No file uploaded",
-					});
+					return reply.status(400).send({ message: "No file uploaded" });
 				}
 
 				let title = "";
 				let description = "";
-				let segment: any = null;
-				let visibility: any = "PUBLIC";
+				let segment: CreateVideoDTO["segment"] | null = null;
+				let visibility: CreateVideoDTO["visibility"] = "PUBLIC";
 				let tags: string[] = [];
 				let videoUrl = "";
 				let thumbnailUrl = "";
@@ -66,11 +44,15 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 				for await (const part of data) {
 					if (part.type === "field") {
 						if (part.fieldname === "title") title = part.value as string;
-						if (part.fieldname === "segment") segment = part.value as string;
-						if (part.fieldname === "description")
-							description = part.value as string;
-						if (part.fieldname === "visibility")
-							visibility = part.value as string;
+						if (part.fieldname === "segment") {
+							const parsed = segmentEnum.safeParse(part.value);
+							if (parsed.success) segment = parsed.data;
+						}
+						if (part.fieldname === "description") description = part.value as string;
+						if (part.fieldname === "visibility") {
+							const parsed = visibilityEnum.safeParse(part.value);
+							if (parsed.success) visibility = parsed.data;
+						}
 						if (part.fieldname === "tags") {
 							try {
 								tags = JSON.parse(part.value as string);
@@ -87,7 +69,6 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 								contentType: part.mimetype,
 							});
 						}
-
 						if (part.fieldname === "thumbnail") {
 							thumbnailUrl = await storeMediaFile({
 								stream: part.file,
@@ -110,18 +91,16 @@ export const createVideoRoute: FastifyPluginAsyncZod = async (server) => {
 					description,
 					videoUrl,
 					thumbnailUrl,
-					segment: segment || "FULLSTACK",
-					visibility: visibility as any,
+					segment: segment ?? "FULLSTACK",
+					visibility,
 					tags,
 					userId,
 				});
 
 				return reply.status(201).send(video);
-			} catch (error: any) {
+			} catch (error: unknown) {
 				console.error(error);
-				return reply.status(500).send({
-					message: "Internal server error",
-				});
+				return reply.status(500).send({ message: "Internal server error" });
 			}
 		},
 	);

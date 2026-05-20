@@ -1,6 +1,6 @@
 import { createPrismaVideoRepository } from "../../infrastructure/repositories/PrismaVideoRepository";
 
-type CreateVideoDTO = {
+export type CreateVideoDTO = {
    title: string;
    description?: string;
    videoUrl: string;
@@ -44,5 +44,8 @@ export default async function createVideo(data: CreateVideoDTO) {
       segment: video.segment,
       tags: video.tags,
       userId: video.userId,
+      publishedAt: video.publishedAt,
+      createdAt: video.createdAt,
+      user: video.user,
    };
 }

@@ -13,6 +13,7 @@ export interface VideoProps {
    publishedAt: Date;
    createdAt: Date;
    user?: {
+      id: string;
       name: string;
       username: string;
       avatarUrl: string | null;

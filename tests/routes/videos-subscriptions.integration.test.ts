@@ -168,6 +168,7 @@ describe("Video and subscription routes", () => {
 				tags: ["ddd"],
 				userId: "user-1",
 				publishedAt: new Date("2024-01-01"),
+				createdAt: new Date("2024-01-01"),
 			},
 		]);
 		mocks.getVideoById.mockResolvedValue({
@@ -183,6 +184,7 @@ describe("Video and subscription routes", () => {
 			tags: ["ddd"],
 			userId: "user-1",
 			publishedAt: new Date("2024-01-01"),
+			createdAt: new Date("2024-01-01"),
 		});
 
 		const server = await createRouteTestServer([
@@ -247,6 +249,8 @@ describe("Video and subscription routes", () => {
 			segment: "BACKEND",
 			tags: ["ddd"],
 			userId: "user-1",
+			publishedAt: new Date("2024-01-01"),
+			createdAt: new Date("2024-01-01"),
 		});
 
 		const server = await createRouteTestServer([
@@ -391,7 +395,22 @@ describe("Video and subscription routes", () => {
 	it("covers like and comment actions in the legacy video route", async () => {
 		mocks.prisma.user.findUnique.mockResolvedValue(mocks.authedUser);
 		mocks.prisma.video.findMany.mockResolvedValue([
-			{ id: "video-1", title: "Liked video" },
+			{
+				id: "video-1",
+				title: "Liked video",
+				description: null,
+				videoUrl: "https://cdn.test/video.mp4",
+				thumbnailUrl: "https://cdn.test/thumb.jpg",
+				duration: "5:00",
+				views: 10,
+				visibility: "PUBLIC",
+				segment: "BACKEND",
+				tags: [],
+				userId: "user-1",
+				publishedAt: new Date("2024-01-01"),
+				createdAt: new Date("2024-01-01"),
+				user: { id: "user-1", name: "Test User", username: "testuser", avatarUrl: null },
+			},
 		]);
 		mocks.prisma.video.findUnique.mockResolvedValue({ id: "video-1" });
 		mocks.prisma.like.findFirst.mockResolvedValue(null);
@@ -495,23 +514,80 @@ describe("Video and subscription routes", () => {
 			{ plugin: subscriptionRoutes, prefix: "/subscriptions" },
 		]);
 
-		const videoLikeResponse = await server.inject({
-			method: "POST",
-			url: "/videos/video-missing/like",
-		});
-		expect(videoLikeResponse.statusCode).toBe(404);
+		const postLikeResponse = await server.inject({ method: "POST", url: "/videos/video-missing/like" });
+		expect(postLikeResponse.statusCode).toBe(404);
 
-		const watchLaterResponse = await server.inject({
-			method: "POST",
-			url: "/videos/video-missing/watch-later",
-		});
-		expect(watchLaterResponse.statusCode).toBe(404);
+		const deleteLikeResponse = await server.inject({ method: "DELETE", url: "/videos/video-missing/like" });
+		expect(deleteLikeResponse.statusCode).toBe(404);
 
-		const commentLikeResponse = await server.inject({
+		const postWatchLaterResponse = await server.inject({ method: "POST", url: "/videos/video-missing/watch-later" });
+		expect(postWatchLaterResponse.statusCode).toBe(404);
+
+		const deleteWatchLaterResponse = await server.inject({ method: "DELETE", url: "/videos/video-missing/watch-later" });
+		expect(deleteWatchLaterResponse.statusCode).toBe(404);
+
+		const postHistoryResponse = await server.inject({ method: "POST", url: "/videos/video-missing/history" });
+		expect(postHistoryResponse.statusCode).toBe(404);
+
+		const postCommentLikeResponse = await server.inject({ method: "POST", url: "/videos/comments/comment-missing/like" });
+		expect(postCommentLikeResponse.statusCode).toBe(404);
+
+		const deleteCommentLikeResponse = await server.inject({ method: "DELETE", url: "/videos/comments/comment-missing/like" });
+		expect(deleteCommentLikeResponse.statusCode).toBe(404);
+	});
+
+	it("returns 404 when video not found on POST /comments", async () => {
+		mocks.prisma.video.findUnique.mockResolvedValue(null);
+
+		const server = await createRouteTestServer([
+			{ plugin: videoRoutes, prefix: "/videos" },
+		]);
+
+		const response = await server.inject({
 			method: "POST",
-			url: "/videos/comments/comment-missing/like",
+			url: "/videos/comments",
+			payload: { content: "Great video", videoId: "video-missing" },
 		});
-		expect(commentLikeResponse.statusCode).toBe(404);
+		expect(response.statusCode).toBe(404);
+	});
+
+	it("returns 500 when user-action prisma calls throw", async () => {
+		const boom = new Error("boom");
+		mocks.prisma.user.findUnique.mockResolvedValue(mocks.authedUser);
+		mocks.prisma.video.findUnique.mockResolvedValue({ id: "video-1" });
+		mocks.prisma.comment.findUnique.mockResolvedValue({ id: "comment-1" });
+		mocks.prisma.like.findFirst.mockRejectedValue(boom);
+		mocks.prisma.like.create.mockRejectedValue(boom);
+		mocks.prisma.like.delete.mockRejectedValue(boom);
+		mocks.prisma.comment.create.mockRejectedValue(boom);
+
+		const server = await createRouteTestServer([
+			{ plugin: videoRoutes, prefix: "/videos" },
+		]);
+
+		// like.findFirst throws → 500
+		const postLike = await server.inject({ method: "POST", url: "/videos/video-1/like" });
+		expect(postLike.statusCode).toBe(500);
+
+		// video-3 is in likedVideoIds so the branch runs → like.findFirst throws → 500
+		const deleteLike = await server.inject({ method: "DELETE", url: "/videos/video-3/like" });
+		expect(deleteLike.statusCode).toBe(500);
+
+		// comment.create throws → 500
+		const postComment = await server.inject({
+			method: "POST",
+			url: "/videos/comments",
+			payload: { content: "hello", videoId: "video-1" },
+		});
+		expect(postComment.statusCode).toBe(500);
+
+		// like.findFirst throws → 500
+		const postCommentLike = await server.inject({ method: "POST", url: "/videos/comments/comment-1/like" });
+		expect(postCommentLike.statusCode).toBe(500);
+
+		// comment-1 found, like.findFirst throws → 500
+		const deleteCommentLike = await server.inject({ method: "DELETE", url: "/videos/comments/comment-1/like" });
+		expect(deleteCommentLike.statusCode).toBe(500);
 	});
 
 	it("returns legacy video action unauthorized responses", async () => {

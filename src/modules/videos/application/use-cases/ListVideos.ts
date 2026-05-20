@@ -24,6 +24,7 @@ export default async function listVideos(data: ListVideosDTO) {
       tags: v.tags,
       userId: v.userId,
       publishedAt: v.publishedAt,
+      createdAt: v.createdAt,
       user: v.user,
    }));
 }

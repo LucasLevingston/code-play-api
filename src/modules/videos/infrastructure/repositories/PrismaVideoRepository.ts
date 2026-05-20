@@ -2,7 +2,7 @@ import { prisma } from "../../../../lib/prisma";
 import type { VideoProps } from "../../domain/entities/Video";
 import type { IVideoRepository } from "../../domain/repositories/IVideoRepository";
 
-const userSelect = { name: true, username: true, avatarUrl: true } as const;
+const userSelect = { id: true, name: true, username: true, avatarUrl: true } as const;
 
 export function createPrismaVideoRepository(): IVideoRepository {
    return {

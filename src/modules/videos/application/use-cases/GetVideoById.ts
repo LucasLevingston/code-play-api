@@ -24,6 +24,7 @@ export default async function getVideoById(videoId: string) {
       tags: video.tags,
       userId: video.userId,
       publishedAt: video.publishedAt,
+      createdAt: video.createdAt,
       user: video.user,
    };
 }
