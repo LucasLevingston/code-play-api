@@ -167,6 +167,7 @@ describe("Video and subscription routes", () => {
 				segment: "BACKEND",
 				tags: ["ddd"],
 				userId: "user-1",
+				publishedAt: new Date("2024-01-01"),
 			},
 		]);
 		mocks.getVideoById.mockResolvedValue({
@@ -181,6 +182,7 @@ describe("Video and subscription routes", () => {
 			segment: "BACKEND",
 			tags: ["ddd"],
 			userId: "user-1",
+			publishedAt: new Date("2024-01-01"),
 		});
 
 		const server = await createRouteTestServer([

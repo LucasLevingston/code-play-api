@@ -21,6 +21,14 @@ const listedVideoSchema = z.object({
 	]),
 	tags: z.array(z.string()),
 	userId: z.string(),
+	publishedAt: z.union([z.string(), z.date()]),
+	user: z
+		.object({
+			name: z.string(),
+			username: z.string(),
+			avatarUrl: z.string().nullable(),
+		})
+		.optional(),
 });
 
 export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {

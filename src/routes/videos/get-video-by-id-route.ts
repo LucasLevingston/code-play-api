@@ -22,6 +22,14 @@ const detailedVideoSchema = z.object({
 	tags: z.array(z.string()),
 	visibility: z.enum(["PUBLIC", "UNLISTED", "PRIVATE"]),
 	userId: z.string(),
+	publishedAt: z.union([z.string(), z.date()]),
+	user: z
+		.object({
+			name: z.string(),
+			username: z.string(),
+			avatarUrl: z.string().nullable(),
+		})
+		.optional(),
 });
 
 export const getVideoByIdRoute: FastifyPluginAsyncZod = async (server) => {
@@ -48,8 +56,8 @@ export const getVideoByIdRoute: FastifyPluginAsyncZod = async (server) => {
 				const video = await getVideoById(videoId);
 
 				return reply.status(200).send(video);
-			} catch (error: any) {
-				if (error.code === "VIDEO_NOT_FOUND") {
+			} catch (error: unknown) {
+				if (error instanceof Error && (error as Error & { code?: string }).code === "VIDEO_NOT_FOUND") {
 					return reply.status(404).send({
 						message: "Video not found",
 					});

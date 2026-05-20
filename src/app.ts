@@ -43,25 +43,26 @@ server.register(fastifyJwt, {
 	secret: JWT_SECRET_KEY || "secret-key",
 });
 
-if (NODE_ENV === "development") {
-	server.register(fastifySwagger, {
-		openapi: {
-			info: {
-				title: "CodePlay-API",
-				description: "API from ExpertGP",
-				version: "1.0.0",
-			},
-			components: {
-				securitySchemes: {
-					bearerAuth: {
-						type: "http",
-						scheme: "bearer",
-						bearerFormat: "JWT",
-					},
+server.register(fastifySwagger, {
+	openapi: {
+		info: {
+			title: "CodePlay-API",
+			description: "API from ExpertGP",
+			version: "1.0.0",
+		},
+		components: {
+			securitySchemes: {
+				bearerAuth: {
+					type: "http",
+					scheme: "bearer",
+					bearerFormat: "JWT",
 				},
 			},
 		},
-	});
+	},
+});
+
+if (NODE_ENV === "development") {
 	server.register(Scalar, {
 		routePrefix: "/docs",
 		configuration: {

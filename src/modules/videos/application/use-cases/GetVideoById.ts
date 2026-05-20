@@ -5,12 +5,10 @@ export default async function getVideoById(videoId: string) {
 
    const video = await repo.findById(videoId);
    if (!video) {
-      const err = new Error("Video not found");
-      (err as any).code = "VIDEO_NOT_FOUND";
+      const err = Object.assign(new Error("Video not found"), { code: "VIDEO_NOT_FOUND" });
       throw err;
    }
 
-   // Increment views
    await repo.incrementViews(videoId);
 
    return {
@@ -20,10 +18,12 @@ export default async function getVideoById(videoId: string) {
       videoUrl: video.videoUrl,
       thumbnailUrl: video.thumbnailUrl,
       duration: video.duration,
-      views: video.views + 1, // Include the incremented view
+      views: video.views + 1,
       visibility: video.visibility,
       segment: video.segment,
       tags: video.tags,
       userId: video.userId,
+      publishedAt: video.publishedAt,
+      user: video.user,
    };
 }
