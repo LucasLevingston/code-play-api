@@ -26,6 +26,11 @@ const mocks = vi.hoisted(() => {
 		loginUser: vi.fn(),
 		getCurrentUser: vi.fn(),
 		getUserById: vi.fn(),
+		prisma: {
+			user: { findUnique: vi.fn() },
+			subscription: { count: vi.fn(), findFirst: vi.fn() },
+			video: { count: vi.fn(), findMany: vi.fn() },
+		},
 	};
 });
 
@@ -51,12 +56,21 @@ vi.mock("../../src/hooks/check-request-jwt", () => ({
 	},
 }));
 
+vi.mock("../../src/lib/prisma", () => ({
+	prisma: mocks.prisma,
+}));
+
 describe("Auth and user routes", () => {
 	beforeEach(() => {
 		mocks.registerUser.mockReset();
 		mocks.loginUser.mockReset();
 		mocks.getCurrentUser.mockReset();
 		mocks.getUserById.mockReset();
+		mocks.prisma.user.findUnique.mockReset();
+		mocks.prisma.subscription.count.mockReset();
+		mocks.prisma.subscription.findFirst.mockReset();
+		mocks.prisma.video.count.mockReset();
+		mocks.prisma.video.findMany.mockReset();
 	});
 
 	it("registers and logs in users", async () => {
@@ -103,28 +117,19 @@ describe("Auth and user routes", () => {
 		expect(registerResponse.statusCode).toBe(201);
 		expect(JSON.parse(registerResponse.payload)).toMatchObject({
 			token: "token-user-2",
-			user: {
-				id: "user-2",
-				email: "new@test.com",
-			},
+			user: { id: "user-2", email: "new@test.com" },
 		});
 
 		const loginResponse = await server.inject({
 			method: "POST",
 			url: "/auth/login",
-			payload: {
-				email: "new@test.com",
-				password: "password123",
-			},
+			payload: { email: "new@test.com", password: "password123" },
 		});
 
 		expect(loginResponse.statusCode).toBe(200);
 		expect(JSON.parse(loginResponse.payload)).toMatchObject({
 			token: "token-user-2",
-			user: {
-				id: "user-2",
-				avatarUrl: null,
-			},
+			user: { id: "user-2", avatarUrl: null },
 		});
 	});
 
@@ -154,18 +159,13 @@ describe("Auth and user routes", () => {
 				username: "newuser",
 			},
 		});
-
 		expect(registerResponse.statusCode).toBe(409);
 
 		const loginResponse = await server.inject({
 			method: "POST",
 			url: "/auth/login",
-			payload: {
-				email: "new@test.com",
-				password: "wrong-password",
-			},
+			payload: { email: "new@test.com", password: "wrong-password" },
 		});
-
 		expect(loginResponse.statusCode).toBe(401);
 	});
 
@@ -179,7 +179,8 @@ describe("Auth and user routes", () => {
 			role: "USER",
 			avatarUrl: null,
 		});
-		mocks.getUserById.mockResolvedValue({
+
+		mocks.prisma.user.findUnique.mockResolvedValue({
 			id: "user-2",
 			name: "Other User",
 			username: "other",
@@ -187,17 +188,20 @@ describe("Auth and user routes", () => {
 			age: 22,
 			role: "USER",
 			avatarUrl: "https://cdn.test/avatar.png",
+			password: "hashed",
+			createdAt: new Date("2025-01-01T00:00:00.000Z"),
 		});
+		mocks.prisma.subscription.count.mockResolvedValue(10);
+		mocks.prisma.video.count.mockResolvedValue(3);
+		mocks.prisma.subscription.findFirst.mockResolvedValue(null);
+		mocks.prisma.video.findMany.mockResolvedValue([]);
 
 		const server = await createRouteTestServer([
 			{ plugin: authRoutes, prefix: "/auth" },
 			{ plugin: userRoutes, prefix: "/users" },
 		]);
 
-		const currentResponse = await server.inject({
-			method: "GET",
-			url: "/users/me",
-		});
+		const currentResponse = await server.inject({ method: "GET", url: "/users/me" });
 
 		expect(currentResponse.statusCode).toBe(200);
 		expect(JSON.parse(currentResponse.payload)).toMatchObject({
@@ -206,16 +210,17 @@ describe("Auth and user routes", () => {
 			avatarUrl: null,
 		});
 
-		const userResponse = await server.inject({
-			method: "GET",
-			url: "/users/user-2",
-		});
+		const userResponse = await server.inject({ method: "GET", url: "/users/user-2" });
 
 		expect(userResponse.statusCode).toBe(200);
 		expect(JSON.parse(userResponse.payload)).toMatchObject({
 			id: "user-2",
 			username: "other",
 			avatarUrl: "https://cdn.test/avatar.png",
+			subscribersCount: 10,
+			videosCount: 3,
+			isSubscribed: false,
+			videos: [],
 		});
 	});
 
@@ -223,7 +228,7 @@ describe("Auth and user routes", () => {
 		const notFoundError = new Error("User not found");
 		;(notFoundError as any).code = "USER_NOT_FOUND";
 		mocks.getCurrentUser.mockRejectedValue(notFoundError);
-		mocks.getUserById.mockRejectedValue(notFoundError);
+		mocks.prisma.user.findUnique.mockResolvedValue(null);
 
 		const server = await createRouteTestServer([
 			{ plugin: authRoutes, prefix: "/auth" },
@@ -248,9 +253,7 @@ describe("Auth and user routes", () => {
 			avatarUrl: null,
 		});
 
-		const server = await createRouteTestServer([
-			{ plugin: authRoutes, prefix: "/auth" },
-		]);
+		const server = await createRouteTestServer([{ plugin: authRoutes, prefix: "/auth" }]);
 
 		const response = await server.inject({ method: "GET", url: "/auth/me" });
 		expect(response.statusCode).toBe(200);
@@ -258,11 +261,8 @@ describe("Auth and user routes", () => {
 	});
 
 	it("validates auth route bodies and rejects bad input", async () => {
-		const server = await createRouteTestServer([
-			{ plugin: authRoutes, prefix: "/auth" },
-		]);
+		const server = await createRouteTestServer([{ plugin: authRoutes, prefix: "/auth" }]);
 
-		// Register: missing name, age, username; invalid email; short password
 		const registerBad = await server.inject({
 			method: "POST",
 			url: "/auth/register",
@@ -270,7 +270,6 @@ describe("Auth and user routes", () => {
 		});
 		expect(registerBad.statusCode).toBe(400);
 
-		// Login: missing email
 		const loginMissingEmail = await server.inject({
 			method: "POST",
 			url: "/auth/login",
@@ -278,7 +277,6 @@ describe("Auth and user routes", () => {
 		});
 		expect(loginMissingEmail.statusCode).toBe(400);
 
-		// Login: invalid email format
 		const loginBadEmail = await server.inject({
 			method: "POST",
 			url: "/auth/login",
@@ -307,7 +305,7 @@ describe("Auth and user routes", () => {
 		mocks.registerUser.mockRejectedValue(boom);
 		mocks.loginUser.mockRejectedValue(boom);
 		mocks.getCurrentUser.mockRejectedValue(boom);
-		mocks.getUserById.mockRejectedValue(boom);
+		mocks.prisma.user.findUnique.mockRejectedValue(boom);
 
 		const server = await createRouteTestServer([
 			{ plugin: authRoutes, prefix: "/auth" },

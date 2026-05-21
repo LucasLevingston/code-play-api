@@ -1,6 +1,6 @@
 import { prisma } from "../../../../lib/prisma";
 import type { VideoProps } from "../../domain/entities/Video";
-import type { IVideoRepository } from "../../domain/repositories/IVideoRepository";
+import type { IVideoRepository, VideoFilters } from "../../domain/repositories/IVideoRepository";
 
 const userSelect = { id: true, name: true, username: true, avatarUrl: true } as const;
 
@@ -55,11 +55,24 @@ export function createPrismaVideoRepository(): IVideoRepository {
          }));
       },
 
-      async findAll(limit = 10, offset = 0) {
+      async findAll(limit = 10, offset = 0, filters?: VideoFilters) {
+         const { segment, search, userId, tag, sortBy = "createdAt", sortOrder = "desc" } = filters ?? {};
+
+         const where = {
+            visibility: "PUBLIC" as const,
+            ...(userId && { userId }),
+            ...(segment && { segment: segment as VideoProps["segment"] }),
+            ...(search && { title: { contains: search, mode: "insensitive" as const } }),
+            ...(tag && { tags: { has: tag } }),
+         };
+
+         const orderBy = { [sortBy]: sortOrder as "asc" | "desc" };
+
          const videos = await prisma.video.findMany({
-            where: { visibility: "PUBLIC" },
+            where,
             take: limit,
             skip: offset,
+            orderBy,
             include: { user: { select: userSelect } },
          });
          return videos.map((v) => ({

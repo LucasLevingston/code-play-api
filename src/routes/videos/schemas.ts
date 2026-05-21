@@ -45,3 +45,28 @@ export const commentResponseSchema = z.object({
 		avatarUrl: z.string().nullable(),
 	}),
 });
+
+export const videoUserDetailSchema = videoUserSchema.extend({
+	subscribersCount: z.number(),
+});
+
+export const videoCommentSchema = z.object({
+	id: z.string(),
+	content: z.string(),
+	createdAt: z.union([z.string(), z.date()]),
+	author: z.object({
+		id: z.string(),
+		name: z.string(),
+		avatarUrl: z.string().nullable(),
+	}),
+	likesCount: z.number(),
+	isLiked: z.boolean(),
+});
+
+export const videoDetailSchema = videoItemSchema.extend({
+	user: videoUserDetailSchema.optional(),
+	isLiked: z.boolean(),
+	isSubscribed: z.boolean(),
+	likesCount: z.number(),
+	comments: z.array(videoCommentSchema),
+});

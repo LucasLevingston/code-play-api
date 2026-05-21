@@ -16,7 +16,7 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 					search: z.string().optional(),
 					userId: z.string().optional(),
 					tag: z.string().optional(),
-					sortBy: z.enum(["createdAt", "views", "likes"]).default("createdAt"),
+					sortBy: z.enum(["createdAt", "views"]).default("createdAt"),
 					sortOrder: z.enum(["asc", "desc"]).default("desc"),
 					visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]).optional(),
 					videoId: z.string().optional(),
@@ -33,10 +33,10 @@ export const listVideosRoute: FastifyPluginAsyncZod = async (server) => {
 		},
 		async (request, reply) => {
 			try {
-				const { page = 1, limit = 10 } = request.query;
+				const { page = 1, limit = 10, segment, search, userId, tag, sortBy, sortOrder } = request.query;
 				const offset = (page - 1) * limit;
 
-				const videos = await listVideos({ limit, offset });
+				const videos = await listVideos({ limit, offset, segment, search, userId, tag, sortBy, sortOrder });
 
 				return reply.status(200).send(videos);
 			} catch (error: unknown) {

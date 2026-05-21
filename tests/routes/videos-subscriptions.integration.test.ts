@@ -43,12 +43,19 @@ const mocks = vi.hoisted(() => {
 			},
 			like: {
 				findFirst: vi.fn(),
+				findMany: vi.fn(),
 				create: vi.fn(),
 				delete: vi.fn(),
+				count: vi.fn(),
 			},
 			comment: {
 				findUnique: vi.fn(),
 				create: vi.fn(),
+				findMany: vi.fn(),
+			},
+			subscription: {
+				findFirst: vi.fn(),
+				count: vi.fn(),
 			},
 		},
 	};
@@ -147,10 +154,15 @@ describe("Video and subscription routes", () => {
 		mocks.prisma.video.findMany.mockReset();
 		mocks.prisma.video.findUnique.mockReset();
 		mocks.prisma.like.findFirst.mockReset();
+		mocks.prisma.like.findMany.mockReset();
 		mocks.prisma.like.create.mockReset();
 		mocks.prisma.like.delete.mockReset();
+		mocks.prisma.like.count.mockReset();
 		mocks.prisma.comment.findUnique.mockReset();
 		mocks.prisma.comment.create.mockReset();
+		mocks.prisma.comment.findMany.mockReset();
+		mocks.prisma.subscription.findFirst.mockReset();
+		mocks.prisma.subscription.count.mockReset();
 	});
 
 	it("lists and fetches videos", async () => {
@@ -200,6 +212,14 @@ describe("Video and subscription routes", () => {
 		expect(listResponse.statusCode).toBe(200);
 		expect(JSON.parse(listResponse.payload)).toHaveLength(1);
 
+		// enrichment mocks for GET /videos/:videoId
+		mocks.prisma.like.count.mockResolvedValue(7);
+		mocks.prisma.like.findFirst.mockResolvedValue(null);
+		mocks.prisma.like.findMany.mockResolvedValue([]);
+		mocks.prisma.subscription.findFirst.mockResolvedValue(null);
+		mocks.prisma.subscription.count.mockResolvedValue(50);
+		mocks.prisma.comment.findMany.mockResolvedValue([]);
+
 		const detailResponse = await server.inject({
 			method: "GET",
 			url: "/videos/video-1",
@@ -209,6 +229,10 @@ describe("Video and subscription routes", () => {
 		expect(JSON.parse(detailResponse.payload)).toMatchObject({
 			id: "video-1",
 			views: 124,
+			isLiked: false,
+			isSubscribed: false,
+			likesCount: 7,
+			comments: [],
 		});
 
 		const notFoundError = new Error("Video not found");
@@ -627,8 +651,7 @@ describe("Video and subscription routes", () => {
 		mocks.getVideoById.mockRejectedValueOnce(new Error("boom"));
 		mocks.storeMediaFile.mockRejectedValueOnce(new Error("boom"));
 		mocks.getCurrentUser.mockRejectedValueOnce(new Error("boom"));
-		mocks.getUserById.mockRejectedValueOnce(new Error("boom"));
-		mocks.prisma.user.findUnique.mockResolvedValue(mocks.authedUser);
+		mocks.prisma.user.findUnique.mockImplementationOnce(() => { throw new Error("boom"); });
 		mocks.prisma.video.findUnique.mockResolvedValue({ id: "video-1" });
 		mocks.prisma.comment.findUnique.mockResolvedValue({ id: "comment-1" });
 
