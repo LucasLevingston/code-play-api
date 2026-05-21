@@ -703,6 +703,42 @@ describe("Video and subscription routes", () => {
 		expect(unsubscribeErrorResponse.statusCode).toBe(500);
 	});
 
+	it("returns 500 when prisma throws on GET video collection routes", async () => {
+		const boom = new Error("boom");
+		const server = await createRouteTestServer([{ plugin: videoRoutes, prefix: "/videos" }]);
+
+		mocks.prisma.user.findUnique.mockRejectedValue(boom);
+
+		expect((await server.inject({ method: "GET", url: "/videos/liked" })).statusCode).toBe(500);
+		expect((await server.inject({ method: "GET", url: "/videos/watch-later" })).statusCode).toBe(500);
+		expect((await server.inject({ method: "GET", url: "/videos/history" })).statusCode).toBe(500);
+
+		mocks.prisma.user.findUnique.mockResolvedValue(mocks.authedUser);
+		mocks.prisma.video.findMany.mockRejectedValue(boom);
+
+		expect((await server.inject({ method: "GET", url: "/videos/liked" })).statusCode).toBe(500);
+		expect((await server.inject({ method: "GET", url: "/videos/watch-later" })).statusCode).toBe(500);
+		expect((await server.inject({ method: "GET", url: "/videos/history" })).statusCode).toBe(500);
+	});
+
+	it("returns 500 when prisma.user.update throws on video action routes", async () => {
+		const boom = new Error("boom");
+		mocks.prisma.user.findUnique.mockResolvedValue(mocks.authedUser);
+		mocks.prisma.video.findUnique.mockResolvedValue({ id: "video-1" });
+		mocks.prisma.user.update.mockRejectedValue(boom);
+
+		const server = await createRouteTestServer([{ plugin: videoRoutes, prefix: "/videos" }]);
+
+		// video-999 NOT in watchLaterIds → update is called (push) → throws → 500
+		expect((await server.inject({ method: "POST", url: "/videos/video-999/watch-later" })).statusCode).toBe(500);
+
+		// video-1 IS in watchLaterIds → update is called (filter) → throws → 500
+		expect((await server.inject({ method: "DELETE", url: "/videos/video-1/watch-later" })).statusCode).toBe(500);
+
+		// history update always called → throws → 500
+		expect((await server.inject({ method: "POST", url: "/videos/video-1/history" })).statusCode).toBe(500);
+	});
+
 	it("returns subscriptions not-found when the user is missing", async () => {
 		const notFoundError = new Error("User not found");
 		;(notFoundError as any).code = "USER_NOT_FOUND";

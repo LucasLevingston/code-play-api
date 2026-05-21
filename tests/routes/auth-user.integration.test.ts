@@ -230,18 +230,108 @@ describe("Auth and user routes", () => {
 			{ plugin: userRoutes, prefix: "/users" },
 		]);
 
-		const currentResponse = await server.inject({
-			method: "GET",
-			url: "/users/me",
-		});
-
+		const currentResponse = await server.inject({ method: "GET", url: "/users/me" });
 		expect(currentResponse.statusCode).toBe(404);
 
-		const userResponse = await server.inject({
-			method: "GET",
-			url: "/users/user-404",
+		const userResponse = await server.inject({ method: "GET", url: "/users/user-404" });
+		expect(userResponse.statusCode).toBe(404);
+	});
+
+	it("returns GET /auth/me profile", async () => {
+		mocks.getCurrentUser.mockResolvedValue({
+			id: "user-1",
+			name: "Test User",
+			username: "testuser",
+			email: "test@test.com",
+			age: 20,
+			role: "USER",
+			avatarUrl: null,
 		});
 
-		expect(userResponse.statusCode).toBe(404);
+		const server = await createRouteTestServer([
+			{ plugin: authRoutes, prefix: "/auth" },
+		]);
+
+		const response = await server.inject({ method: "GET", url: "/auth/me" });
+		expect(response.statusCode).toBe(200);
+		expect(JSON.parse(response.payload)).toMatchObject({ id: "user-1", username: "testuser" });
+	});
+
+	it("validates auth route bodies and rejects bad input", async () => {
+		const server = await createRouteTestServer([
+			{ plugin: authRoutes, prefix: "/auth" },
+		]);
+
+		// Register: missing name, age, username; invalid email; short password
+		const registerBad = await server.inject({
+			method: "POST",
+			url: "/auth/register",
+			payload: { email: "notanemail", password: "short" },
+		});
+		expect(registerBad.statusCode).toBe(400);
+
+		// Login: missing email
+		const loginMissingEmail = await server.inject({
+			method: "POST",
+			url: "/auth/login",
+			payload: { password: "password123" },
+		});
+		expect(loginMissingEmail.statusCode).toBe(400);
+
+		// Login: invalid email format
+		const loginBadEmail = await server.inject({
+			method: "POST",
+			url: "/auth/login",
+			payload: { email: "not-an-email", password: "password123" },
+		});
+		expect(loginBadEmail.statusCode).toBe(400);
+	});
+
+	it("returns 404 when login user is not found", async () => {
+		const notFoundError = new Error("User not found");
+		;(notFoundError as any).code = "USER_NOT_FOUND";
+		mocks.loginUser.mockRejectedValue(notFoundError);
+
+		const server = await createRouteTestServer([{ plugin: authRoutes, prefix: "/auth" }]);
+
+		const response = await server.inject({
+			method: "POST",
+			url: "/auth/login",
+			payload: { email: "ghost@test.com", password: "password123" },
+		});
+		expect(response.statusCode).toBe(404);
+	});
+
+	it("returns 500 on unexpected errors across all auth and user routes", async () => {
+		const boom = new Error("boom");
+		mocks.registerUser.mockRejectedValue(boom);
+		mocks.loginUser.mockRejectedValue(boom);
+		mocks.getCurrentUser.mockRejectedValue(boom);
+		mocks.getUserById.mockRejectedValue(boom);
+
+		const server = await createRouteTestServer([
+			{ plugin: authRoutes, prefix: "/auth" },
+			{ plugin: userRoutes, prefix: "/users" },
+		]);
+
+		const registerResponse = await server.inject({
+			method: "POST",
+			url: "/auth/register",
+			payload: { name: "User", age: 20, password: "password123", email: "user@test.com", username: "user" },
+		});
+		expect(registerResponse.statusCode).toBe(500);
+
+		const loginResponse = await server.inject({
+			method: "POST",
+			url: "/auth/login",
+			payload: { email: "user@test.com", password: "password123" },
+		});
+		expect(loginResponse.statusCode).toBe(500);
+
+		const meResponse = await server.inject({ method: "GET", url: "/users/me" });
+		expect(meResponse.statusCode).toBe(500);
+
+		const userResponse = await server.inject({ method: "GET", url: "/users/user-1" });
+		expect(userResponse.statusCode).toBe(500);
 	});
 });
