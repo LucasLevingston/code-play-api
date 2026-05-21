@@ -24,7 +24,6 @@ export default async function registerUser(data: RegisterDTO) {
    const hashedPassword = await hashPassword(password);
 
    const user = await repo.create({
-      id: crypto.randomUUID(),
       name,
       age,
       role: (role || "USER") as "USER" | "ADMIN",

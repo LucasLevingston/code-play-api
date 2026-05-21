@@ -55,10 +55,9 @@ export function createPrismaUserRepository(): IUserRepository {
             : null;
       },
 
-      async create(user: UserProps) {
+      async create(user: Omit<UserProps, "id">) {
          const created = await prisma.user.create({
             data: {
-               id: user.id,
                name: user.name,
                email: user.email,
                password: user.password,
