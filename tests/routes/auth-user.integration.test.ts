@@ -260,6 +260,17 @@ describe("Auth and user routes", () => {
 		expect(JSON.parse(response.payload)).toMatchObject({ id: "user-1", username: "testuser" });
 	});
 
+	it("returns 404 when GET /auth/me user does not exist", async () => {
+		const notFoundError = new Error("User not found");
+		;(notFoundError as any).code = "USER_NOT_FOUND";
+		mocks.getCurrentUser.mockRejectedValue(notFoundError);
+
+		const server = await createRouteTestServer([{ plugin: authRoutes, prefix: "/auth" }]);
+
+		const response = await server.inject({ method: "GET", url: "/auth/me" });
+		expect(response.statusCode).toBe(404);
+	});
+
 	it("validates auth route bodies and rejects bad input", async () => {
 		const server = await createRouteTestServer([{ plugin: authRoutes, prefix: "/auth" }]);
 
